@@ -29,7 +29,7 @@ if __name__ == "__main__":
                 for point in segment.points:
                     coords.append([point.time, point.latitude, point.longitude, point.elevation])
 
-    cols = ['Time', 'Latitude', 'Longitude', 'Elevation']
+    cols = ['Time', 'Lat', 'Lon', 'Elev']
     coords_df = pd.DataFrame(coords, columns=cols)
 
     print(coords_df.head())
@@ -44,25 +44,33 @@ if __name__ == "__main__":
     import geopandas as gpd
     from shapely.geometry import Point
 
-    geom = [Point(xy) for xy in zip(coords_df.Longitude, coords_df.Latitude)]
-    coords_df.drop(['Latitude', 'Longitude'], axis=1)
+    geom = [Point(xy) for xy in zip(coords_df.Lon, coords_df.Lat)]
+    coords_df.drop(['Lat', 'Lon'], axis=1)
     crs = {'init': 'epsg:4326'}
     coords_gdf = gpd.GeoDataFrame(coords_df, crs=crs, geometry=geom)
+    coords_gdf.sort_values(by='Time', inplace=True) 
 
     print(coords_df.head())
     print(coords_df.info())
 
     #Create linestrings
-    #[(y1, x1), ... (yn, xn)]
+    #[(x1, y1, z1), ... (xn, yn, zn)]
+    #TODO: Add elevations 
+    #TODO: Split linestrings where distances are large (500-1000km?)
+    #TODO: Import linestrings into GeoDataframe 
+    from shapely.geometry import LineString
+    coords = zip(coords_gdf.Lon, coords_gdf.Lat)
+    coords_ls = LineString(coords)
 
     #Calculate statistics
     #Num points, total distance, elevations
-    #Countries visited, time spent per country (spatial join/group by) 
+    #Countries visited, time spent per country 
 
     #Visualize with matplotplib, Folium
     #Visualize wholedataset 
     #Visualize one country in particular 
     import matplotlib.pyplot as plt
-    coords_gdf.plot()
+    ax = coords_gdf.plot()
+    gpd.plotting.plot_linestring_collection(ax=ax, geoms=[coords_ls])
     plt.show()
 
