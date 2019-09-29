@@ -17,7 +17,7 @@ files = [join(args.path, f) for f in files if isfile(join(args.path, f))]
 import gpxpy
 import pandas as pd 
     
-coords = []
+points = []
 for f in files:
     print(f)
     #fiona.open(f, layer='tracks')
@@ -26,33 +26,33 @@ for f in files:
     for track in gpx.tracks: 
         for segment in track.segments: 
             for point in segment.points:
-                coords.append([point.time, point.latitude, point.longitude, point.elevation])
+                points.append([point.time, point.latitude, point.longitude, point.elevation])
 
 cols = ['Time', 'Lat', 'Lon', 'Elev']
-coords_df = pd.DataFrame(coords, columns=cols)
+points_df = pd.DataFrame(points, columns=cols)
 
-print(coords_df.head())
-#print(coords_df.info())
+print(points_df.head())
+#print(points_df.info())
 
 #Remove duplicate points based on timestamp 
-coords_df.drop_duplicates(subset='Time', inplace=True)
+points_df.drop_duplicates(subset='Time', inplace=True)
     
 #Sort by time
-coords_df.sort_values(by='Time', inplace=True) 
+points_df.sort_values(by='Time', inplace=True) 
 
-print(coords_df.info())
+print(points_df.info())
 
 #Convert points into a GeoDataframe 
 import geopandas as gpd
 from shapely.geometry import Point
 
-geom = [Point(xy) for xy in zip(coords_df.Lon, coords_df.Lat, coords_df.Elev)]
-#coords_df.drop(['Lat', 'Lon'], axis=1)
+geom = [Point(xy) for xy in zip(points_df.Lon, points_df.Lat, points_df.Elev)]
+#points_df.drop(['Lat', 'Lon'], axis=1)
 crs = {'init': 'epsg:4326'}
-coords_gdf = gpd.GeoDataFrame(coords_df, crs=crs, geometry=geom)
+points_gdf = gpd.GeoDataFrame(points_df, crs=crs, geometry=geom)
 
-print(coords_gdf.info())
-print(coords_gdf.head())
+print(points_gdf.info())
+print(points_gdf.head())
 
 #Write points to file 
 #note: to_file can't handle datetimes
@@ -64,9 +64,9 @@ schema = {
         'Lon': 'float',
         'Elev': 'float',
 }}
-#coords_gdf.to_file("points_cleaned.geojson", driver='GeoJSON', schema=schema)
-#coords_gdf.to_file("cleaned.gpkg", layer='Track points', driver='GPKG', schema=schema)
-#coords_gdf[['geometry','Lat','Lon','Elev']].to_file("points_cleaned.shp")
+#points_gdf.to_file("points_cleaned.geojson", driver='GeoJSON', schema=schema)
+#points_gdf.to_file("cleaned.gpkg", layer='Track points', driver='GPKG', schema=schema)
+#points_gdf[['geometry','Lat','Lon','Elev']].to_file("points_cleaned.shp")
 
 #Create linestrings
 #[(x1, y1, z1), ... (xn, yn, zn)]
@@ -77,26 +77,26 @@ ls_geom = []
 ls_data = [] #[Start Time, End Time, Start Elev, End Elev, geometry] 
 total_dist = 0
 
-for i in range(0, coords_gdf.shape[0]-1):
-    p0 = coords_gdf.iloc[i]
-    p1 = coords_gdf.iloc[i+1]
+for i in range(0, points_gdf.shape[0]-1):
+    p0 = points_gdf.iloc[i]
+    p1 = points_gdf.iloc[i+1]
 
     p0_geom = p0['geometry']
     p1_geom = p1['geometry']
 
-    p0_coords = (p0_geom.y, p0_geom.x, p0_geom.z)
-    p1_coords = (p1_geom.y, p1_geom.x, p1_geom.z)
-    dist = vincenty(p0_coords, p1_coords).meters/1000
+    p0_points = (p0_geom.y, p0_geom.x, p0_geom.z)
+    p1_points = (p1_geom.y, p1_geom.x, p1_geom.z)
+    dist = vincenty(p0_points, p1_points).meters/1000
 
     if dist > 500: 
         print(dist)
     else: 
         line_data = [p0['Time'], p1['Time'], p0['Elev'], p1['Elev']]
 
-        p0_coords = (p0_geom.x, p0_geom.y, p0_geom.z)
-        p1_coords = (p1_geom.x, p1_geom.y, p1_geom.z)
+        p0_points = (p0_geom.x, p0_geom.y, p0_geom.z)
+        p1_points = (p1_geom.x, p1_geom.y, p1_geom.z)
         ls_data.append(line_data)
-        ls_geom.append(LineString([p0_coords, p1_coords]))
+        ls_geom.append(LineString([p0_points, p1_points]))
         
         total_dist += dist 
 
@@ -132,19 +132,23 @@ schema = {
 #Visualize wholedataset 
 #Visualize one country in particular 
 
-import matplotlib.pyplot as plt
-
+import folium
+pointlist = zip(points_gdf.Lat, points_gdf.Lon)
+fmap = folium.Map(location=[0,0], zoom_start=1)
+folium.PolyLine(pointlist,color='red', weight=2, opacity=1).add_to(fmap)
+fmap.save('test.html')
 '''
-ax = coords_gdf.plot(markersize=2)
+import matplotlib.pyplot as plt
+ax = points_gdf.plot(markersize=2)
 line_gdf.plot(ax=ax)
 plt.show()
 '''
 
 '''
 #Sanity check: View points as one LineString
-coords = zip(coords_gdf.Lon, coords_gdf.Lat, coords_gdf.Elev)
-coords_ls = LineString(coords)
-ax = coords_gdf.plot()
-gpd.plotting.plot_linestring_collection(ax=ax, geoms=[coords_ls])
+points = zip(points_gdf.Lon, points_gdf.Lat, points_gdf.Elev)
+points_ls = LineString(points)
+ax = points_gdf.plot()
+gpd.plotting.plot_linestring_collection(ax=ax, geoms=[points_ls])
 plt.show()
 '''
